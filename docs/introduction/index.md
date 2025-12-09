@@ -1,179 +1,365 @@
----
-title: Introduction
-section_title: Introduction
-type: introduction
-layout: docs
-order: 1
-parent_section: docs
-section_order: 1
-installation: true
-examples:
-  - title: Hello, World!
-    src: https://glitch.com/edit/#!/aframe?path=index.html
----
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <title>Chambre Timeline — Three.js</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    html,body { height:100%; margin:0; font-family:Inter,Arial,Helvetica,sans-serif; background:#f3f4f6; }
+    #app { width:100%; height:100vh; overflow:hidden; position:relative; }
+    canvas { display:block; }
 
-[three.js]: https://threejs.org
+    /* Panel info */
+    .info-panel {
+      position: absolute;
+      right: 20px;
+      top: 20px;
+      width: 320px;
+      max-width: calc(100% - 40px);
+      background: rgba(255,255,255,0.95);
+      border-radius: 8px;
+      box-shadow: 0 6px 30px rgba(15,23,42,0.12);
+      padding: 14px;
+      display: none;
+      gap:8px;
+      z-index: 10;
+    }
+    .info-panel.show { display: flex; flex-direction:column; }
+    .info-panel h3 { margin:0 0 6px 0; font-size:16px; color:#0f172a; }
+    .info-panel p { margin:0 0 10px 0; color:#475569; font-size:13px; }
+    .info-panel img { width:100%; height:150px; object-fit:cover; border-radius:6px; background:#eef2ff }
+    .info-links { display:flex; gap:8px; justify-content:flex-end; }
+    .btn { padding:6px 10px; border-radius:6px; background:#111827; color:white; font-size:13px; text-decoration:none; }
 
-## Getting Started
+    /* Cursor hint */
+    .hint {
+      position:absolute; left:20px; bottom:20px;
+      background: rgba(255,255,255,0.92);
+      padding:8px 12px; border-radius:10px; font-size:13px; color:#374151;
+      box-shadow: 0 6px 24px rgba(15,23,42,0.08);
+    }
 
-[glitch]: http://glitch.com/~aframe
+    /* tiny visual for selected milestone */
+    .milestone-dot { width:10px; height:10px; border-radius:50%; display:inline-block; margin-right:6px; vertical-align:middle; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
 
-A-Frame can be developed from a plain HTML file without having to install
-anything. A great way to try out A-Frame is to **[remix the starter example on
-Glitch][glitch]**, an online code editor that instantly hosts and deploys for
-free. Alternatively, create an `.html` file and include A-Frame in the
-`<head>`:
+  <div class="info-panel" id="infoPanel" aria-hidden="true">
+    <h3 id="infoTitle">Titre</h3>
+    <p id="infoDesc">Description courte du projet...</p>
+    <img id="infoImg" alt="preview" />
+    <div class="info-links">
+      <a id="infoLink" class="btn" target="_blank" rel="noopener">Voir</a>
+    </div>
+  </div>
 
-```html
-<html>
-  <head>
-    <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
-  </head>
-  <body>
-    <a-scene>
-      <a-box position="-1 0.5 -3" rotation="0 45 0" color="#4CC3D9"></a-box>
-      <a-sphere position="0 1.25 -5" radius="1.25" color="#EF2D5E"></a-sphere>
-      <a-cylinder position="1 0.75 -3" radius="0.5" height="1.5" color="#FFC65D"></a-cylinder>
-      <a-plane position="0 0 -4" rotation="-90 0 0" width="4" height="4" color="#7BC8A4"></a-plane>
-      <a-sky color="#ECECEC"></a-sky>
-    </a-scene>
-  </body>
+  <div class="hint">Pan/zoom : souris • Hover → infos • Clic → ouvrir panneau</div>
+
+  <!-- Import map + module script -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script type="module">
+  import * as THREE from 'three';
+  import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+  // small helper - no external tween lib; we'll lerp in the tick
+  const app = document.getElementById('app');
+  const infoPanel = document.getElementById('infoPanel');
+  const infoTitle = document.getElementById('infoTitle');
+  const infoDesc = document.getElementById('infoDesc');
+  const infoImg = document.getElementById('infoImg');
+  const infoLink = document.getElementById('infoLink');
+
+  // renderer
+  const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:false });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  app.appendChild(renderer.domElement);
+
+  // scene & camera
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0xf7f7f8);
+
+  const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 200);
+  camera.position.set(4, 2.2, 6);
+
+  // controls
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.09;
+  controls.minDistance = 2.5;
+  controls.maxDistance = 12;
+  controls.maxPolarAngle = Math.PI/2.1;
+
+  // lights
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x666666, 0.7);
+  scene.add(hemi);
+
+  const dir = new THREE.DirectionalLight(0xffffff, 0.8);
+  dir.position.set(5, 10, 2);
+  dir.castShadow = false;
+  scene.add(dir);
+
+  // room: simple floor + back wall to frame the scene
+  const floorMat = new THREE.MeshStandardMaterial({ color: 0xf8f8f9, roughness:0.9, metalness:0.0 });
+  const floorGeo = new THREE.PlaneGeometry(14, 10);
+  const floor = new THREE.Mesh(floorGeo, floorMat);
+  floor.rotation.x = -Math.PI/2;
+  floor.position.y = 0;
+  scene.add(floor);
+
+  const backWallMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness:1 });
+  const backWall = new THREE.Mesh(new THREE.PlaneGeometry(14,6), backWallMat);
+  backWall.position.set(0,3, -4.5);
+  scene.add(backWall);
+
+  // furniture style: low-poly blocks with wood accents
+  const woodColor = 0xE4B98A;
+  const gray = 0xE6E9EE;
+  const dark = 0x111827;
+
+  function makeBox(w,h,d, color){
+    const geo = new THREE.BoxGeometry(w,h,d);
+    const mat = new THREE.MeshStandardMaterial({ color, roughness:0.7 });
+    return new THREE.Mesh(geo, mat);
+  }
+
+  // desk
+  const desk = new THREE.Group();
+  const deskTop = makeBox(2.4, 0.08, 0.9, 0xffffff);
+  deskTop.position.y = 0.86;
+  desk.add(deskTop);
+  const leg1 = makeBox(0.08,0.7,0.08, woodColor); leg1.position.set(-1.15,0.45,0.38);
+  const leg2 = leg1.clone(); leg2.position.x = 1.15;
+  desk.add(leg1, leg2);
+  desk.position.set(-1.8, 0, -1.5);
+  scene.add(desk);
+
+  // shelf
+  const shelf = new THREE.Group();
+  const shelfBody = makeBox(1.6, 1.6, 0.28, gray);
+  shelfBody.position.y = 1.0;
+  shelf.add(shelfBody);
+  shelf.position.set(1.8, 0, -1.8);
+  scene.add(shelf);
+
+  // bed
+  const bed = new THREE.Group();
+  const bedBase = makeBox(2.2, 0.36, 1.0, 0xffffff);
+  bedBase.position.y = 0.18;
+  bed.add(bedBase);
+  bed.position.set(0.8,0,1.6);
+  scene.add(bed);
+
+  // decorative lamp/poster as milestone candidate
+  const lamp = new THREE.Group();
+  const lampBase = makeBox(0.12, 0.6, 0.12, 0x0f172a);
+  lampBase.position.y = 0.3;
+  const lampShade = new THREE.ConeGeometry(0.18,0.2,6);
+  const lampMat = new THREE.MeshStandardMaterial({ color: 0xfff1d6, roughness:0.6 });
+  const lampMesh = new THREE.Mesh(lampShade, lampMat);
+  lampMesh.position.y = 0.64;
+  lamp.add(lampBase, lampMesh);
+  lamp.position.set(-0.7, 0, -0.9);
+  scene.add(lamp);
+
+  // timeline: a thin tube running through the room
+  const timelineGroup = new THREE.Group();
+  // define points for the curve (across room, through furniture)
+  const points = [
+    new THREE.Vector3(-2.6, 1.05, -2.2),
+    new THREE.Vector3(-1.8, 1.0, -1.4),
+    new THREE.Vector3(-0.2, 1.0, -0.8),
+    new THREE.Vector3(0.9, 1.03, -0.2),
+    new THREE.Vector3(1.7, 1.0, -1.5),
+    new THREE.Vector3(0.9, 1.0, 1.2)
+  ];
+  // create smooth curve
+  const curve = new THREE.CatmullRomCurve3(points);
+  const tubeGeo = new THREE.TubeGeometry(curve, 128, 0.03, 8, false);
+  const tubeMat = new THREE.MeshStandardMaterial({ color: 0x9CA3AF, emissive:0x9CA3AF, emissiveIntensity: 0.18, roughness:0.6 });
+  const tube = new THREE.Mesh(tubeGeo, tubeMat);
+  timelineGroup.add(tube);
+
+  scene.add(timelineGroup);
+
+  // milestones placed along curve (map to objects)
+  // We'll create small cubes with an emissive material; each has metadata
+  const milestoneMat = new THREE.MeshStandardMaterial({ color: 0x111827, emissive:0x00A3FF, emissiveIntensity:0.9, roughness:0.4 });
+  const milestonePositions = [
+    { t: 0.12, ref: desk, title: "Projet récent — App", desc:"Développement d'une app front-end moderne.", img:"", url:"#", color:0x00A3FF },
+    { t: 0.36, ref: shelf, title: "Projets antérieurs", desc:"Plusieurs projets d'UX et d'UI design.", img:"", url:"#", color:0x8B5CF6 },
+    { t: 0.55, ref: lamp, title: "Certifications", desc:"Certifs et compétences clés.", img:"", url:"#", color:0x10B981 },
+    { t: 0.82, ref: bed, title: "Projets perso", desc:"Expérimentations et prototypes.", img:"", url:"#", color:0xF97316 }
+  ];
+
+  const milestones = [];
+  milestonePositions.forEach((m, i) => {
+    const pos = curve.getPointAt(m.t);
+    const cubeGeom = new THREE.BoxGeometry(0.12,0.12,0.12);
+    const mat = new THREE.MeshStandardMaterial({ color: 0x111827, emissive: m.color, emissiveIntensity: 0.95, roughness:0.5 });
+    const mesh = new THREE.Mesh(cubeGeom, mat);
+    mesh.position.copy(pos);
+    mesh.userData = { idx:i, info:m, baseScale:1.0 };
+    scene.add(mesh);
+    milestones.push(mesh);
+
+    // small light to emphasize
+    const pLight = new THREE.PointLight(m.color, 0.25, 1.5);
+    pLight.position.copy(pos);
+    scene.add(pLight);
+  });
+
+  // raycaster for hover/click
+  const raycaster = new THREE.Raycaster();
+  const pointer = new THREE.Vector2();
+  let hovered = null;
+  let selected = null;
+
+  function onPointerMove(e){
+    const rect = renderer.domElement.getBoundingClientRect();
+    pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+  }
+
+  window.addEventListener('pointermove', onPointerMove);
+
+  window.addEventListener('click', (e) => {
+    if (hovered) {
+      openInfo(hovered.userData.info, hovered);
+      // animate camera target toward object
+      initiateCameraMove(hovered.position.clone().add(new THREE.Vector3(0.0,0.6,0.8)), hovered.position.clone());
+      selected = hovered;
+    } else {
+      closeInfo();
+      selected = null;
+    }
+  });
+
+  function openInfo(info, mesh) {
+    infoTitle.textContent = info.title;
+    infoDesc.textContent = info.desc;
+    // placeholder image gradient via dataURL if none provided
+    if (info.img) {
+      infoImg.src = info.img;
+    } else {
+      // small placeholder
+      infoImg.src = generatePlaceholderImg(info.color || 0xD1D5DB);
+    }
+    infoLink.href = info.url || '#';
+    infoPanel.classList.add('show');
+    infoPanel.setAttribute('aria-hidden','false');
+  }
+  function closeInfo(){
+    infoPanel.classList.remove('show');
+    infoPanel.setAttribute('aria-hidden','true');
+  }
+
+  function generatePlaceholderImg(hex) {
+    const c = document.createElement('canvas');
+    c.width = 800; c.height = 400;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#fafafa';
+    ctx.fillRect(0,0,c.width,c.height);
+    ctx.fillStyle = '#e6edf6';
+    ctx.fillRect(0,0,c.width,c.height/2);
+    ctx.fillStyle = '#111827';
+    ctx.font = '28px sans-serif';
+    ctx.fillText('Preview', 18, 60);
+    return c.toDataURL();
+  }
+
+  // Camera move helper
+  let camTarget = new THREE.Vector3(0,1,0);
+  let camGoalPos = null;
+  let camGoalTarget = null;
+  let camMoveTime = 0;
+  function initiateCameraMove(goalPos, goalTarget) {
+    camGoalPos = goalPos.clone();
+    camGoalTarget = goalTarget.clone();
+    camMoveTime = 0.0001;
+  }
+
+  // animate
+  const clock = new THREE.Clock();
+  function animate() {
+    requestAnimationFrame(animate);
+    const dt = clock.getDelta();
+    controls.update();
+
+    // hover detection
+    raycaster.setFromCamera(pointer, camera);
+    const intersects = raycaster.intersectObjects(milestones, false);
+    if (intersects.length) {
+      const obj = intersects[0].object;
+      if (hovered !== obj) {
+        if (hovered) {
+          // reset previous
+          hovered.scale.setScalar(hovered.userData.baseScale);
+          hovered.material.emissiveIntensity = 0.95;
+        }
+        hovered = obj;
+        hovered.scale.setScalar(1.14);
+        hovered.material.emissiveIntensity = 1.6;
+        renderer.domElement.style.cursor = 'pointer';
+      }
+    } else {
+      if (hovered) {
+        hovered.scale.setScalar(hovered.userData.baseScale);
+        hovered.material.emissiveIntensity = 0.95;
+      }
+      hovered = null;
+      renderer.domElement.style.cursor = 'auto';
+    }
+
+    // subtle timeline pulsation
+    const t = clock.elapsedTime;
+    tube.material.emissiveIntensity = 0.18 + Math.sin(t * 1.2) * 0.03;
+
+    // milestone tiny bob or pulse
+    milestones.forEach((m,i) => {
+      m.position.y += Math.sin(t*1.2 + i*0.8) * 0.0005; // extremely subtle
+      // small emissive intensity dance
+      m.material.emissiveIntensity = 0.85 + Math.sin(t*2 + i*0.6)*0.12;
+    });
+
+    // camera lerp if animating
+    if (camGoalPos && camMoveTime < 1.0) {
+      camMoveTime += dt * 2.6; // speed factor
+      const ease = easeOutCubic(Math.min(camMoveTime,1));
+      camera.position.lerpVectors(camera.position, camGoalPos, ease);
+      camTarget.lerpVectors(camTarget, camGoalTarget, ease);
+      controls.target.copy(camTarget);
+    }
+
+    renderer.render(scene, camera);
+  }
+
+  function easeOutCubic(x){ return 1 - Math.pow(1-x,3); }
+
+  animate();
+
+  // handle resize
+  window.addEventListener('resize', () => {
+    const w = window.innerWidth, h = window.innerHeight;
+    renderer.setSize(w,h);
+    camera.aspect = w/h;
+    camera.updateProjectionMatrix();
+  });
+
+  // basic instructions: expose scene elements for easy tweaking in console
+  window.__APP__ = { scene, camera, controls, milestones, tube, desk, shelf, bed, lamp };
+
+  </script>
+</body>
 </html>
-```
 
-[Installation]: ./installation.md
-[school]: https://aframe.io/school/
-
-The [Installation] page provides more options for getting started with A-Frame.
-To get started learning A-Frame, check out [A-Frame School][school] for visual
-step-by-step lessons to complement the documentation.
-
-## What is A-Frame?
-
-[github]: https://github.com/aframevr/
-[community]: https://aframe.io/community/
-
-![A-Frame](https://cloud.githubusercontent.com/assets/674727/25392020/6f011d10-298c-11e7-845e-c3c5baebd14d.jpg)
-
-:a:-Frame is a web framework for building virtual reality (VR) experiences.
-A-Frame is based on top of HTML, making it simple to get started. But A-Frame
-is not just a 3D scene graph or a markup language; the core is a powerful
-entity-component framework that provides a declarative, extensible, and
-composable structure to [three.js].
-
-Originally conceived within Mozilla and now maintained by the co-creators of
-A-Frame within [Supermedium](https://supermedium.com), A-Frame was developed to
-be an easy yet powerful way to develop VR content. As an [independent open
-source project][github], A-Frame has grown to be one of the [largest VR
-communities][community].
-
-A-Frame supports most VR and AR devices such as Meta Quest, Apple Vision Pro, PICO lineup, Lynx-R1 or Valve Index 
-Although A-Frame supports the whole spectrum, A-Frame aims to define
-fully immersive interactive VR experiences that go beyond basic 360&deg;
-content, making full use of positional tracking and controllers.
-
-<div class="docs-introduction-examples">
-  <a href="https://supermedium.com/supercraft">
-    <img alt="Supercraft" target="_blank" src="https://user-images.githubusercontent.com/674727/41085457-f5429566-69eb-11e8-92e5-3210e4c6c4a0.gif" height="190" width="32%">
-  </a>
-  <a href="https://aframe.io/a-painter/?url=https://ucarecdn.com/962b242b-87a9-422c-b730-febdc470f203/">
-    <img alt="A-Painter" target="_blank" src="https://cloud.githubusercontent.com/assets/674727/24531388/acfc3dda-156d-11e7-8563-5bd75252f70f.gif" height="190" width="32%">
-  </a>
-  <a href="https://supermedium.com">
-    <img alt="Supermedium" target="_blank" src="https://user-images.githubusercontent.com/674727/37294616-7212cd20-25d3-11e8-9e7f-c0c61074f1e0.png" height="190" width="32%">
-  </a>
-  <a href="https://aframe.io/a-blast/">
-    <img alt="A-Blast" target="_blank" src="https://cloud.githubusercontent.com/assets/674727/24531440/0336e66e-156e-11e7-95c2-f2e6ebc0393d.gif" height="190" width="32%">
-  </a>
-  <a href="https://aframe.io/a-saturday-night/">
-    <img alt="A-Saturday-Night" target="_blank" src="https://cloud.githubusercontent.com/assets/674727/24531477/44272daa-156e-11e7-8ef9-d750ed430f3a.gif" height="190" width="32%">
-  </a>
-  <a href="https://github.com/googlecreativelab/webvr-musicalforest">
-    <img alt="Musical Forest by @googlecreativelab" target="_blank" src="https://cloud.githubusercontent.com/assets/674727/25109861/b8e9ec48-2394-11e7-8f2d-ea1cd9df69c8.gif" height="190" width="32%">
-  </a>
-</div>
-
-## Features
-
-:eyeglasses: **VR Made Simple**: Just drop in a `<script>` tag and `<a-scene>`.
-A-Frame will handle 3D boilerplate, VR setup, and default controls. Nothing to
-install, no build steps.
-
-:heart: **Declarative HTML**: HTML is easy to read, understand, and
-copy-and-paste. Being based on top of HTML, A-Frame is accessible to everyone:
-web developers, VR enthusiasts, artists, designers, educators, makers, kids.
-
-:electric_plug: **Entity-Component Architecture**: A-Frame is a powerful
-[three.js] framework, providing a declarative, composable, reusable
-[entity-component structure][ecs]. HTML is just the tip of the iceberg;
-developers have unlimited access to JavaScript, DOM APIs, three.js, WebVR, and
-WebGL.
-
-:globe_with_meridians: **Cross-Platform VR**: Build VR applications for Vive,
-Rift, Meta Quest, Windows Mixed Reality, and Apple Vision Pro with support for
-all respective controllers. Don't have a headset or controllers? No problem!
-A-Frame still works on standard desktop and smartphones.
-
-[ecs]: ./entity-component-system.md
-
-[A-Painter]: https://github.com/aframevr/a-painter
-[Tilt Brush]: https://www.tiltbrush.com/
-
-:zap: **Performance**: A-Frame is optimized from the ground up for WebVR. While
-A-Frame uses the DOM, its elements don't touch the browser layout engine. 3D
-object updates are all done in memory with little garbage and overhead. The most
-interactive and large scale WebVR applications have been done in A-Frame
-running smoothly at 90fps.
-
-[inspector]: ./visual-inspector-and-dev-tools.md
-
-:mag: **Visual Inspector**: A-Frame provides a handy built-in [visual 3D
-inspector][inspector]. Open up *any* A-Frame scene, hit `<ctrl> + <alt> + i` or `<ctrl> + <option> + i`,
-and fly around to peek under the hood!
-
-![Inspector](https://cloud.githubusercontent.com/assets/674727/25377018/27be9cce-295b-11e7-9098-3e85ac1fe172.gif)
-
-[augmented reality]: https://github.com/jeromeetienne/AR.js#augmented-reality-for-the-web-in-less-than-10-lines-of-html
-[environment]: https://github.com/supermedium/aframe-environment-component
-[multiuser]: https://github.com/networked-aframe/networked-aframe
-[oceans]: https://github.com/c-frame/aframe-extras/tree/master/src/primitives
-[particle systems]: https://github.com/c-frame/aframe-particle-system-component
-[physics]: https://github.com/c-frame/aframe-physics-system
-[state]: https://npmjs.com/package/aframe-state-component
-[super hands]: https://github.com/c-frame/aframe-super-hands-component
-[teleportation]: https://github.com/jure/aframe-blink-controls
-
-:runner: **Components**: Hit the ground running with A-Frame's core components
-such as geometries, materials, lights, animations, models, raycasters, shadows,
-positional audio, text, and controls for most major headsets. Get even further
-from the hundreds of community components including [environment], [state], [particle
-systems], [physics], [multiuser], [oceans], [teleportation], [super hands], and
-[augmented reality].
-
-:earth_americas: **Proven and Scalable**: A-Frame has been used by companies
-such as Google, Disney, Samsung, Toyota, Ford, Chevrolet, Amnesty
-International, CERN, NPR, Al Jazeera, The Washington Post, NASA. Companies such
-as Google, Microsoft, Oculus, and Samsung have made contributions to A-Frame.
-
-## Off You Go!
-
-[Discord]: https://supermedium.com/discord
-
-If it's your first time here, here's a plan for success for getting into
-A-Frame:
-
-1. Read through the documentation to get a grasp.
-[Glitch](https://glitch.com/~aframe) is used as a recommended coding playground
-and for examples.
-
-2. [Join us on Discord][Discord] if you have any
-questions, [search and ask on StackOverflow](http://stackoverflow.com/questions/ask/?tags=aframe),
-and someone will try to get to you!
-
-3. When you build something, share your project online on X with the
-   `@aframevr` mention. You can also post it on the #self-promotion channel on
-   [Supermedium Discord][Discord] and #a-frame channel on
-   [WebXR Discord](https://discord.gg/jJxvuW97c4).
-
-And it really helps to have a dig into the fundamentals on JavaScript and
-[three.js](https://threejs.org/). Have fun!
